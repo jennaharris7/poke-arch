@@ -79,6 +79,7 @@ dependencies {
     ksp(libs.room.compiler)
     ksp(libs.hilt.compiler)
     testImplementation(libs.junit)
+    testImplementation(libs.kotlin.test)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.okhttp.mockwebserver)
     testImplementation(libs.turbine)
