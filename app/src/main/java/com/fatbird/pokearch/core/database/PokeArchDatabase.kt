@@ -4,9 +4,13 @@ import androidx.room.Database
 import androidx.room.RoomDatabase
 import com.fatbird.pokearch.core.database.dao.PokemonDao
 import com.fatbird.pokearch.core.database.model.PokemonEntity
+import com.fatbird.pokearch.core.database.model.PokemonRemoteKeysEntity
 
 @Database(
-    entities = [PokemonEntity::class],
+    entities = [
+        PokemonEntity::class,
+        PokemonRemoteKeysEntity::class,
+    ],
     version = 1,
     exportSchema = true,
 )
