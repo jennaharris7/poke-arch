@@ -3,8 +3,15 @@
 
     <string name="core_ui_api_source_rest">REST</string>
     <string name="core_ui_api_source_graphql">GraphQL</string>
+    <string name="core_ui_back">Back</string>
 
     <string name="feature_home_prompt">Choose an API to load Pokémon from</string>
     <string name="feature_home_rest_description">pokeapi.co. The list endpoint returns only names and URLs, so ids and sprites are derived on the client.</string>
     <string name="feature_home_graphql_description">graphql-pokeapi. A single query returns each Pokémon\'s id, name and image.</string>
+
+    <string name="feature_pokemonlist_title">%1$s Pokémon</string>
+    <string name="feature_pokemonlist_number">#%1$03d</string>
+    <string name="feature_pokemonlist_error">Couldn\'t load Pokémon. Check your connection and try again.</string>
+    <string name="feature_pokemonlist_retry">Retry</string>
+    <string name="feature_pokemonlist_refresh_failed">Couldn\'t refresh. Showing saved Pokémon.</string>
 </resources>
