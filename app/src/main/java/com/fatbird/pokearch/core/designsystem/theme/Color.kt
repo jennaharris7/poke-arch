@@ -1,4 +1,4 @@
-package com.fatbird.pokearch.ui.theme
+package com.fatbird.pokearch.core.designsystem.theme
 
 import androidx.compose.ui.graphics.Color
 

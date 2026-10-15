@@ -1,4 +1,4 @@
-package com.fatbird.pokearch.ui.theme
+package com.fatbird.pokearch.core.designsystem.theme
 
 import android.app.Activity
 import android.os.Build
