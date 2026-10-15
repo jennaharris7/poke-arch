@@ -1,3 +1,10 @@
 <resources>
     <string name="app_name">PokeArch</string>
+
+    <string name="core_ui_api_source_rest">REST</string>
+    <string name="core_ui_api_source_graphql">GraphQL</string>
+
+    <string name="feature_home_prompt">Choose an API to load Pokémon from</string>
+    <string name="feature_home_rest_description">pokeapi.co. The list endpoint returns only names and URLs, so ids and sprites are derived on the client.</string>
+    <string name="feature_home_graphql_description">graphql-pokeapi. A single query returns each Pokémon\'s id, name and image.</string>
 </resources>
