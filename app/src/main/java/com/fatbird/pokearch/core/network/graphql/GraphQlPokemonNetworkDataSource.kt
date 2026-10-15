@@ -1,15 +1,9 @@
 package com.fatbird.pokearch.core.network.graphql
 
-import com.fatbird.pokearch.BuildConfig
 import com.fatbird.pokearch.core.network.PokemonNetworkDataSource
 import com.fatbird.pokearch.core.network.model.NetworkPokemon
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
-import okhttp3.Call
-import okhttp3.MediaType.Companion.toMediaType
-import retrofit2.Retrofit
-import retrofit2.converter.kotlinx.serialization.asConverterFactory
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -18,17 +12,8 @@ import javax.inject.Singleton
  */
 @Singleton
 internal class GraphQlPokemonNetworkDataSource @Inject constructor(
-    networkJson: Json,
-    okhttpCallFactory: dagger.Lazy<Call.Factory>,
+    private val api: GraphQlPokemonApi,
 ) : PokemonNetworkDataSource {
-
-    private val api = Retrofit.Builder()
-        .baseUrl(BuildConfig.POKE_API_GRAPHQL_URL)
-        // Defer OkHttp creation until the first request so it never happens on the main thread.
-        .callFactory { okhttpCallFactory.get().newCall(it) }
-        .addConverterFactory(networkJson.asConverterFactory("application/json".toMediaType()))
-        .build()
-        .create(GraphQlPokemonApi::class.java)
 
     override suspend fun getPokemon(limit: Int, offset: Int): List<NetworkPokemon> {
         val response = api.getPokemons(
