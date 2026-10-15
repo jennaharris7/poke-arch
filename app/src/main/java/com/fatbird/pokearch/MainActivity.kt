@@ -5,7 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import com.fatbird.pokearch.core.designsystem.theme.PokeArchTheme
-import com.fatbird.pokearch.feature.home.HomeScreen
+import com.fatbird.pokearch.ui.PokeArchApp
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
@@ -15,8 +15,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             PokeArchTheme {
-                // Navigation to the list screen is wired up once Navigation 3 is added.
-                HomeScreen(onApiSourceClick = {})
+                PokeArchApp()
             }
         }
     }
