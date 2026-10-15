@@ -1,9 +1,14 @@
 package com.fatbird.pokearch.core.network.di
 
+import android.content.Context
+import coil3.ImageLoader
+import coil3.network.okhttp.OkHttpNetworkFetcherFactory
+import coil3.request.crossfade
 import com.fatbird.pokearch.BuildConfig
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import kotlinx.serialization.json.Json
 import okhttp3.Call
@@ -35,5 +40,21 @@ internal object NetworkModule {
                 }
             },
         )
+        .build()
+
+    /**
+     * Coil image loader that shares the app's OkHttp client. Installed as Coil's singleton by
+     * [com.fatbird.pokearch.PokeArchApplication].
+     */
+    @Provides
+    @Singleton
+    fun imageLoader(
+        okHttpCallFactory: dagger.Lazy<Call.Factory>,
+        @ApplicationContext application: Context,
+    ): ImageLoader = ImageLoader.Builder(application)
+        .components {
+            add(OkHttpNetworkFetcherFactory(callFactory = { okHttpCallFactory.get() }))
+        }
+        .crossfade(true)
         .build()
 }
