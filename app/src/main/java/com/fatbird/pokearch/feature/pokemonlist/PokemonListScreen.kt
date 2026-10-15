@@ -32,6 +32,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -184,6 +185,8 @@ private fun PokemonCard(
                 imageUrl = pokemon.imageUrl,
                 // The name is announced by the text below.
                 contentDescription = null,
+                // Sprites are small pixel art; skip smoothing so they stay crisp when scaled up.
+                filterQuality = FilterQuality.None,
                 modifier = Modifier.size(96.dp),
             )
             Text(

@@ -11,6 +11,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.unit.dp
@@ -26,6 +28,7 @@ fun PokeArchAsyncImage(
     contentDescription: String?,
     modifier: Modifier = Modifier,
     contentScale: ContentScale = ContentScale.Fit,
+    filterQuality: FilterQuality = DrawScope.DefaultFilterQuality,
 ) {
     var isLoading by remember { mutableStateOf(true) }
     // Previews can't load network images, so skip the indefinite spinner there.
@@ -45,6 +48,7 @@ fun PokeArchAsyncImage(
             model = imageUrl,
             contentDescription = contentDescription,
             contentScale = contentScale,
+            filterQuality = filterQuality,
             onState = { state -> isLoading = state is AsyncImagePainter.State.Loading },
             modifier = Modifier.fillMaxSize(),
         )
