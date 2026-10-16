@@ -8,7 +8,6 @@ import com.fatbird.pokearch.core.data.repository.PokemonRepository
 import com.fatbird.pokearch.core.model.ApiSource
 import com.fatbird.pokearch.core.model.Pokemon
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.emptyFlow
 
 /**
  * [PokemonRepository] that pages through Pokémon supplied by the test. A real [Pager] drives the
@@ -28,10 +27,6 @@ class TestPokemonRepository : PokemonRepository {
             pagingSourceFactory = { pokemon.asPagingSourceFactory().invoke() },
         ).flow
     }
-
-    override fun getPokemon(source: ApiSource): Flow<List<Pokemon>> = emptyFlow()
-
-    override suspend fun refresh(source: ApiSource) = Unit
 
     /** Sets the Pokémon served by paging sources created from now on. */
     fun sendPokemon(pokemon: List<Pokemon>) {
