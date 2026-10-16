@@ -1,5 +1,6 @@
 package com.fatbird.pokearch.core.data.repository
 
+import androidx.paging.testing.asSnapshot
 import com.fatbird.pokearch.core.model.ApiSource
 import com.fatbird.pokearch.core.model.Pokemon
 import com.fatbird.pokearch.core.network.model.NetworkPokemon
@@ -38,6 +39,50 @@ class OfflineFirstPokemonRepositoryTest {
                 ApiSource.GRAPHQL to graphQlDataSource,
             ),
         )
+    }
+
+    @Test
+    fun getPokemonPagingData_loadsInitialPagesFromNetwork() = runTest {
+        val snapshot = repository.getPokemonPagingData(ApiSource.REST).asSnapshot()
+
+        assertEquals((1..150).toList(), snapshot.map(Pokemon::id))
+        assertEquals(
+            Pokemon(id = 25, name = "rest-25", imageUrl = "https://example.com/rest/25.png"),
+            snapshot[24],
+        )
+    }
+
+    @Test
+    fun getPokemonPagingData_scrollingToEnd_loadsRemainingPages() = runTest {
+        val snapshot = repository.getPokemonPagingData(ApiSource.REST).asSnapshot {
+            appendScrollWhile { true }
+        }
+
+        assertEquals(200, snapshot.last().id)
+        // Each page write invalidates the paging source, which then reloads around the scroll
+        // position, so the snapshot is only a window; the cache holds the full list.
+        assertEquals((1..200).toList(), repository.getPokemon(ApiSource.REST).first().map(Pokemon::id))
+    }
+
+    @Test
+    fun getPokemonPagingData_keepsEachSourceSeparate() = runTest {
+        val snapshot = repository.getPokemonPagingData(ApiSource.GRAPHQL).asSnapshot()
+
+        assertTrue(snapshot.all { it.name.startsWith("graphql-") })
+        assertTrue(repository.getPokemon(ApiSource.REST).first().isEmpty())
+    }
+
+    @Test
+    fun getPokemonPagingData_networkFailure_surfacesErrorAndKeepsCache() = runTest {
+        repository.getPokemonPagingData(ApiSource.REST).asSnapshot()
+        val cachedBefore = repository.getPokemon(ApiSource.REST).first()
+        restDataSource.error = IOException("offline")
+
+        // asSnapshot rethrows the mediator's error, which reaches the UI as a LoadState.Error.
+        assertFailsWith<IOException> {
+            repository.getPokemonPagingData(ApiSource.REST).asSnapshot()
+        }
+        assertEquals(cachedBefore, repository.getPokemon(ApiSource.REST).first())
     }
 
     @Test
