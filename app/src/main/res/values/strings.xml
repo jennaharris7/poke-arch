@@ -14,4 +14,5 @@
     <string name="feature_pokemonlist_error">Couldn\'t load Pokémon. Check your connection and try again.</string>
     <string name="feature_pokemonlist_retry">Retry</string>
     <string name="feature_pokemonlist_refresh_failed">Couldn\'t refresh. Showing saved Pokémon.</string>
+    <string name="feature_pokemonlist_append_error">Couldn\'t load more Pokémon.</string>
 </resources>

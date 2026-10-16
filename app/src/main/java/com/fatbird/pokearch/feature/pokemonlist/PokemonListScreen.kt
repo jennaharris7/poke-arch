@@ -11,8 +11,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
@@ -28,7 +28,6 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -42,13 +41,21 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.paging.LoadState
+import androidx.paging.LoadStates
+import androidx.paging.PagingData
+import androidx.paging.compose.LazyPagingItems
+import androidx.paging.compose.collectAsLazyPagingItems
+import androidx.paging.compose.itemContentType
+import androidx.paging.compose.itemKey
 import com.fatbird.pokearch.R
 import com.fatbird.pokearch.core.designsystem.component.PokeArchAsyncImage
 import com.fatbird.pokearch.core.designsystem.theme.PokeArchTheme
 import com.fatbird.pokearch.core.model.ApiSource
 import com.fatbird.pokearch.core.model.Pokemon
 import com.fatbird.pokearch.core.ui.titleRes
+import kotlinx.coroutines.flow.flowOf
+import java.io.IOException
 
 @Composable
 fun PokemonListRoute(
@@ -60,11 +67,9 @@ fun PokemonListRoute(
             creationCallback = { factory -> factory.create(apiSource) },
         ),
 ) {
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     PokemonListScreen(
         apiSource = apiSource,
-        uiState = uiState,
-        onRefresh = viewModel::refresh,
+        pokemon = viewModel.pokemon.collectAsLazyPagingItems(),
         onBackClick = onBackClick,
         modifier = modifier,
     )
@@ -74,16 +79,19 @@ fun PokemonListRoute(
 @Composable
 internal fun PokemonListScreen(
     apiSource: ApiSource,
-    uiState: PokemonListUiState,
-    onRefresh: () -> Unit,
+    pokemon: LazyPagingItems<Pokemon>,
     onBackClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val refreshState = pokemon.loadState.refresh
+    val hasPokemon = pokemon.itemCount > 0
+
     val snackbarHostState = remember { SnackbarHostState() }
     val refreshFailedMessage = stringResource(R.string.feature_pokemonlist_refresh_failed)
-    val refreshFailed = (uiState as? PokemonListUiState.Success)?.refreshFailed == true
-    LaunchedEffect(refreshFailed) {
-        if (refreshFailed) snackbarHostState.showSnackbar(refreshFailedMessage)
+    // Keyed on the error itself so each failed refresh is announced once.
+    val refreshError = (refreshState as? LoadState.Error)?.takeIf { hasPokemon }
+    LaunchedEffect(refreshError) {
+        if (refreshError != null) snackbarHostState.showSnackbar(refreshFailedMessage)
     }
 
     Scaffold(
@@ -110,26 +118,10 @@ internal fun PokemonListScreen(
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { innerPadding ->
-        when (uiState) {
-            PokemonListUiState.Loading -> Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding),
-                contentAlignment = Alignment.Center,
-            ) {
-                CircularProgressIndicator()
-            }
-
-            PokemonListUiState.Error -> ErrorContent(
-                onRetry = onRefresh,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding),
-            )
-
-            is PokemonListUiState.Success -> PullToRefreshBox(
-                isRefreshing = uiState.isRefreshing,
-                onRefresh = onRefresh,
+        when {
+            hasPokemon -> PullToRefreshBox(
+                isRefreshing = refreshState is LoadState.Loading,
+                onRefresh = pokemon::refresh,
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(top = innerPadding.calculateTopPadding()),
@@ -137,7 +129,7 @@ internal fun PokemonListScreen(
                 // Let the grid scroll behind the navigation bar while keeping its last row reachable.
                 val layoutDirection = LocalLayoutDirection.current
                 PokemonGrid(
-                    pokemon = uiState.pokemon,
+                    pokemon = pokemon,
                     contentPadding = PaddingValues(
                         start = innerPadding.calculateStartPadding(layoutDirection) + 16.dp,
                         top = 16.dp,
@@ -146,16 +138,33 @@ internal fun PokemonListScreen(
                     ),
                 )
             }
+
+            refreshState is LoadState.Error -> ErrorContent(
+                onRetry = pokemon::retry,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding),
+            )
+
+            else -> Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding),
+                contentAlignment = Alignment.Center,
+            ) {
+                CircularProgressIndicator()
+            }
         }
     }
 }
 
 @Composable
 private fun PokemonGrid(
-    pokemon: List<Pokemon>,
+    pokemon: LazyPagingItems<Pokemon>,
     contentPadding: PaddingValues,
     modifier: Modifier = Modifier,
 ) {
+    val appendState = pokemon.loadState.append
     LazyVerticalGrid(
         columns = GridCells.Adaptive(minSize = 120.dp),
         contentPadding = contentPadding,
@@ -163,15 +172,53 @@ private fun PokemonGrid(
         verticalArrangement = Arrangement.spacedBy(12.dp),
         modifier = modifier.fillMaxSize(),
     ) {
-        items(pokemon, key = { it.id }) { pokemon ->
-            PokemonCard(pokemon = pokemon)
+        items(
+            count = pokemon.itemCount,
+            key = pokemon.itemKey { it.id },
+            contentType = pokemon.itemContentType { "pokemon" },
+        ) { index ->
+            // Null while a placeholder's page is still loading from the cache.
+            PokemonCard(pokemon = pokemon[index])
+        }
+        if (appendState !is LoadState.NotLoading) {
+            item(span = { GridItemSpan(maxLineSpan) }, contentType = "appendState") {
+                AppendStateFooter(appendState = appendState, onRetry = pokemon::retry)
+            }
+        }
+    }
+}
+
+@Composable
+private fun AppendStateFooter(
+    appendState: LoadState,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        if (appendState is LoadState.Error) {
+            Text(
+                text = stringResource(R.string.feature_pokemonlist_append_error),
+                style = MaterialTheme.typography.bodyMedium,
+                textAlign = TextAlign.Center,
+            )
+            Button(onClick = onRetry) {
+                Text(text = stringResource(R.string.feature_pokemonlist_retry))
+            }
+        } else {
+            CircularProgressIndicator()
         }
     }
 }
 
 @Composable
 private fun PokemonCard(
-    pokemon: Pokemon,
+    pokemon: Pokemon?,
     modifier: Modifier = Modifier,
 ) {
     Card(modifier = modifier.fillMaxWidth()) {
@@ -181,21 +228,29 @@ private fun PokemonCard(
                 .padding(12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            PokeArchAsyncImage(
-                imageUrl = pokemon.imageUrl,
-                // The name is announced by the text below.
-                contentDescription = null,
-                // Sprites are small pixel art; skip smoothing so they stay crisp when scaled up.
-                filterQuality = FilterQuality.None,
-                modifier = Modifier.size(96.dp),
-            )
+            // Placeholders keep the same layout with blank content so the grid doesn't shift once
+            // their page loads.
+            if (pokemon != null) {
+                PokeArchAsyncImage(
+                    imageUrl = pokemon.imageUrl,
+                    // The name is announced by the text below.
+                    contentDescription = null,
+                    // Sprites are small pixel art; skip smoothing so they stay crisp when scaled up.
+                    filterQuality = FilterQuality.None,
+                    modifier = Modifier.size(96.dp),
+                )
+            } else {
+                Box(modifier = Modifier.size(96.dp))
+            }
             Text(
-                text = stringResource(R.string.feature_pokemonlist_number, pokemon.id),
+                text = pokemon?.let {
+                    stringResource(R.string.feature_pokemonlist_number, it.id)
+                }.orEmpty(),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
-                text = pokemon.name.replaceFirstChar { it.titlecase() },
+                text = pokemon?.name?.replaceFirstChar { it.titlecase() }.orEmpty(),
                 style = MaterialTheme.typography.titleSmall,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -232,14 +287,25 @@ private val previewPokemon = listOf(
     Pokemon(id = 25, name = "pikachu", imageUrl = ""),
 )
 
+@Composable
+private fun previewPagingItems(
+    pokemon: List<Pokemon> = emptyList(),
+    refresh: LoadState = LoadState.NotLoading(endOfPaginationReached = false),
+): LazyPagingItems<Pokemon> {
+    val notLoading = LoadState.NotLoading(endOfPaginationReached = false)
+    val loadStates = LoadStates(refresh = refresh, prepend = notLoading, append = notLoading)
+    return remember(pokemon, refresh) {
+        flowOf(PagingData.from(pokemon, sourceLoadStates = loadStates))
+    }.collectAsLazyPagingItems()
+}
+
 @PreviewLightDark
 @Composable
 private fun PokemonListScreenSuccessPreview() {
     PokeArchTheme {
         PokemonListScreen(
             apiSource = ApiSource.GRAPHQL,
-            uiState = PokemonListUiState.Success(previewPokemon),
-            onRefresh = {},
+            pokemon = previewPagingItems(pokemon = previewPokemon),
             onBackClick = {},
         )
     }
@@ -251,8 +317,7 @@ private fun PokemonListScreenLoadingPreview() {
     PokeArchTheme {
         PokemonListScreen(
             apiSource = ApiSource.REST,
-            uiState = PokemonListUiState.Loading,
-            onRefresh = {},
+            pokemon = previewPagingItems(refresh = LoadState.Loading),
             onBackClick = {},
         )
     }
@@ -264,8 +329,7 @@ private fun PokemonListScreenErrorPreview() {
     PokeArchTheme {
         PokemonListScreen(
             apiSource = ApiSource.REST,
-            uiState = PokemonListUiState.Error,
-            onRefresh = {},
+            pokemon = previewPagingItems(refresh = LoadState.Error(IOException("offline"))),
             onBackClick = {},
         )
     }

@@ -1,47 +1,40 @@
 package com.fatbird.pokearch.core.testing
 
+import androidx.paging.Pager
+import androidx.paging.PagingConfig
 import androidx.paging.PagingData
+import androidx.paging.testing.asPagingSourceFactory
 import com.fatbird.pokearch.core.data.repository.PokemonRepository
 import com.fatbird.pokearch.core.model.ApiSource
 import com.fatbird.pokearch.core.model.Pokemon
-import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.emptyFlow
 
 /**
- * [PokemonRepository] whose cached data and refresh outcome are controlled by the test.
+ * [PokemonRepository] that pages through Pokémon supplied by the test. A real [Pager] drives the
+ * paging so collectors see the same load states as in the app.
  */
 class TestPokemonRepository : PokemonRepository {
 
-    private val pokemonFlow = MutableSharedFlow<List<Pokemon>>(
-        replay = 1,
-        onBufferOverflow = BufferOverflow.DROP_OLDEST,
-    )
+    private var pokemon = emptyList<Pokemon>()
 
-    /** When set, [refresh] throws it. */
-    var refreshError: Throwable? = null
+    /** Every source [getPokemonPagingData] was called with, in order. */
+    val requestedSources = mutableListOf<ApiSource>()
 
-    /** When set, [refresh] suspends until it completes, keeping the refresh in flight. */
-    var refreshGate: CompletableDeferred<Unit>? = null
-
-    /** Every source [refresh] was called with, in order. */
-    val refreshedSources = mutableListOf<ApiSource>()
-
-    override fun getPokemonPagingData(source: ApiSource): Flow<PagingData<Pokemon>> =
-        pokemonFlow.map { PagingData.from(it) }
-
-    override fun getPokemon(source: ApiSource): Flow<List<Pokemon>> = pokemonFlow
-
-    override suspend fun refresh(source: ApiSource) {
-        refreshedSources += source
-        refreshGate?.await()
-        refreshError?.let { throw it }
+    override fun getPokemonPagingData(source: ApiSource): Flow<PagingData<Pokemon>> {
+        requestedSources += source
+        return Pager(
+            config = PagingConfig(pageSize = 20),
+            pagingSourceFactory = { pokemon.asPagingSourceFactory().invoke() },
+        ).flow
     }
 
-    /** Emits [pokemon] as the current cache contents. */
+    override fun getPokemon(source: ApiSource): Flow<List<Pokemon>> = emptyFlow()
+
+    override suspend fun refresh(source: ApiSource) = Unit
+
+    /** Sets the Pokémon served by paging sources created from now on. */
     fun sendPokemon(pokemon: List<Pokemon>) {
-        pokemonFlow.tryEmit(pokemon)
+        this.pokemon = pokemon
     }
 }
